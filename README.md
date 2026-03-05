@@ -1,74 +1,69 @@
-# Claude Code Observability with Coralogix
+# Claude Code → Coralogix
 
-Monitor your Claude Code AI agent sessions in real time — token spend, costs, session activity, code changes, and tool behaviour — all flowing into Coralogix over native OpenTelemetry.
+Ship every Claude Code session — token usage, costs, code changes, tool decisions, and prompt logs — directly into Coralogix using Claude Code's built-in OpenTelemetry support.
 
-No SDK. No code changes. Just environment variables.
-
----
-
-## What you get
-
-Once connected, Coralogix receives two types of signals automatically:
-
-**Metrics** — counters that accumulate across every session:
-
-| Metric | What it tracks |
-|---|---|
-| `claude_code_session_count_1_total` | Sessions started |
-| `claude_code_token_usage_1_total` | Tokens per model and type (input / output / cache) |
-| `claude_code_cost_usage_USD_total` | Estimated USD cost per model |
-| `claude_code_lines_of_code_count_1_total` | Lines added and removed |
-| `claude_code_commit_count_total` | Git commits made during a session |
-| `claude_code_code_edit_tool_decision_total` | Accept / reject decisions on code edits |
-| `claude_code_active_time_total_s_total` | Time Claude was actively processing |
-
-**Log events** — one record per notable action, routed to your chosen subsystem:
-
-| Event | What it captures |
-|---|---|
-| `claude_code.user_prompt` | Prompt submitted (content redacted by default) |
-| `claude_code.api_request` | Token counts, cost, latency, and model per request |
-| `claude_code.api_error` | API failures with status and error message |
-| `claude_code.tool_result` | Tool execution outcome, duration, and decision |
-
-All signals include `session.id`, `user.id`, `user.email`, `organization.id`, `app.version`, and `terminal.type` as attributes.
+No agents. No wrappers. No code changes to your projects. Claude Code emits OTLP natively; you just point it at your Coralogix ingress endpoint.
 
 ---
 
-## Pre-built dashboard
+## How it works
 
-A ready-to-import Coralogix dashboard is included as `coralogix-dashboard.json`. It covers:
-
-| Section | Widgets |
-|---|---|
-| **KPI Overview** | Total Sessions · Total Cost (USD) · Total Tokens · Active Time |
-| **Engineering** | Lines Added & Removed · Commits Over Time · Cost per Model · Sessions Over Time |
-| **Tool Activity** | Edit Tool Decisions by type · Acceptance Rate gauge · Token Usage by Type |
-| **User Activity** | Cost per Session · Tokens per Session · Avg Session Duration · Tokens by Model |
-| **Prompt Log** | Live table — timestamp, session ID, model, event type, body |
-
-**To import:**
-1. In your Coralogix tenant go to **Dashboards → New Dashboard**
-2. Open the import menu and paste the contents of `coralogix-dashboard.json`
-3. Save — widgets populate as soon as data flows in
-
-To regenerate or customise the JSON:
-
-```bash
-python3 gen_dashboard.py
+```
+Claude Code  →  OTLP/HTTP  →  Coralogix ingress  →  Metrics Explorer + Logs + Dashboards
 ```
 
+Claude Code exposes telemetry via the OpenTelemetry SDK when `CLAUDE_CODE_ENABLE_TELEMETRY=1` is set. This repo provides:
+
+- `activate.sh` — exports all required env vars into your shell in one step
+- `.env` — stores your Coralogix API key and endpoint (git-ignored)
+- `coralogix-dashboard.json` — a pre-built dashboard ready to import
+- `ping.py` — sends a test payload to confirm the pipeline is working end-to-end
+
 ---
 
-## Quick start
+## Signals sent to Coralogix
 
-### 1. Set your credentials
+### Metrics
+
+All metrics use **delta temporality** — the format Coralogix expects for counters. They show up under **Metrics Explorer** when you search `claude_code`.
+
+| Metric | Labels | What it tracks |
+|---|---|---|
+| `claude_code_session_count_1_total` | `session.id`, `user.id` | Sessions started |
+| `claude_code_session_count_total` | — | Session count (no extra labels) |
+| `claude_code_token_usage_1_total` | `model`, `type` | Tokens by model and type (input / output / cache) |
+| `claude_code_token_usage_tokens_total` | — | Raw token count from API calls |
+| `claude_code_cost_usage_USD_total` | `model` | Estimated USD cost per model |
+| `claude_code_lines_of_code_count_1_total` | `change_type` | Lines added and removed |
+| `claude_code_lines_of_code_count_total` | — | Total lines changed |
+| `claude_code_commit_count_total` | — | Git commits made |
+| `claude_code_code_edit_tool_decision_total` | `decision` | Accept / reject on code edits |
+| `claude_code_active_time_total_s_total` | — | Seconds Claude was actively processing |
+
+### Log events
+
+Log events are routed to the subsystem you configure in `.env`. Query them in **Coralogix Logs** using DataPrime or Lucene.
+
+| Event type | Key attributes |
+|---|---|
+| `claude_code.user_prompt` | `session.id`, `user.id`, `prompt` (opt-in), `model` |
+| `claude_code.api_request` | `model`, token counts, cost, latency |
+| `claude_code.api_error` | `status`, error message |
+| `claude_code.tool_result` | tool name, duration, outcome |
+
+Every signal carries `session.id`, `user.id`, `user.email`, `organization.id`, `app.version`, and `terminal.type`.
+
+---
+
+## Setup
+
+### 1. Configure your Coralogix credentials
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
+Open `.env` and fill in:
 
 ```
 CX_API_KEY=<your-send-your-data-api-key>
@@ -77,32 +72,48 @@ CX_APPLICATION_NAME=claude-code
 CX_SUBSYSTEM_NAME=claude-code-sessions
 ```
 
-**Endpoint by region:**
+Find your Send-Your-Data API key under **Settings → API Keys** in your Coralogix tenant.
 
-| Coralogix domain | Region | OTLP endpoint |
-|---|---|---|
-| `us1.coralogix.com` | US1 | `https://ingress.us1.coralogix.com` |
-| `us2.coralogix.com` | US2 | `https://ingress.us2.coralogix.com` |
-| `eu1.coralogix.com` | EU1 | `https://ingress.eu1.coralogix.com` |
-| `eu2.coralogix.com` | EU2 | `https://ingress.eu2.coralogix.com` |
-| `ap1.coralogix.com` | AP1 | `https://ingress.ap1.coralogix.com` |
-| `ap2.coralogix.com` | AP2 | `https://ingress.ap2.coralogix.com` |
-| `ap3.coralogix.com` | AP3 | `https://ingress.ap3.coralogix.com` |
+**OTLP ingress by region:**
 
-Your domain appears in the URL when you log in to your Coralogix tenant.
+| Domain | OTLP endpoint |
+|---|---|
+| `us1.coralogix.com` | `https://ingress.us1.coralogix.com` |
+| `us2.coralogix.com` | `https://ingress.us2.coralogix.com` |
+| `eu1.coralogix.com` | `https://ingress.eu1.coralogix.com` |
+| `eu2.coralogix.com` | `https://ingress.eu2.coralogix.com` |
+| `ap1.coralogix.com` | `https://ingress.ap1.coralogix.com` |
+| `ap2.coralogix.com` | `https://ingress.ap2.coralogix.com` |
+| `ap3.coralogix.com` | `https://ingress.ap3.coralogix.com` |
 
-### 2. Start a session with telemetry
+### 2. Activate telemetry and start Claude
 
 ```bash
 source activate.sh
 claude
 ```
 
-> `activate.sh` must be **sourced**, not executed — this keeps the exported variables in your current shell. Re-source it whenever you open a new terminal.
+`activate.sh` exports all OTEL variables into your current shell. It must be sourced (not executed) so the variables persist. Re-run it in each new terminal, or see the persistent setup below.
 
-### 3. Persistent setup (optional)
+### 3. Make it permanent (recommended)
 
-To avoid sourcing on every terminal, add these to `~/.config/claude-code/settings.json`:
+Add the following to `~/.zshrc` (or `~/.bashrc`) so every terminal automatically has telemetry enabled:
+
+```bash
+if [ -f "$HOME/path/to/claude-code-coralogix/.env" ]; then
+  set -a; source "$HOME/path/to/claude-code-coralogix/.env"; set +a
+fi
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_ENDPOINT="${CX_OTLP_ENDPOINT}"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${CX_API_KEY}"
+export OTEL_RESOURCE_ATTRIBUTES="cx.application.name=${CX_APPLICATION_NAME},cx.subsystem.name=${CX_SUBSYSTEM_NAME}"
+export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+```
+
+Or use Claude Code's own settings file at `~/.config/claude-code/settings.json`:
 
 ```json
 {
@@ -121,54 +132,52 @@ To avoid sourcing on every terminal, add these to `~/.config/claude-code/setting
 
 ---
 
-## Verify the connection
+## Test the pipeline
 
-Run the included test script before starting a real session:
+Before a real session, send a synthetic payload to confirm Coralogix is receiving data:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python3 ping.py
 ```
 
-Expected output:
-
-```
-Sending test telemetry to: https://ingress.eu1.coralogix.com
-────────────────────────────────────────────────────────────
-Recording test metrics …
-Recording test log events …
-
-Flushing … (waiting 7 s for the metric export interval)
-✓  Metrics exported successfully
-✓  Log events exported successfully
-
-Done! Open your Coralogix tenant and look for:
-  Metrics  → Metrics Explorer → search "claude_code"
-  Logs     → filter subsystemName = claude-code-sessions
-```
+Then in Coralogix:
+- **Metrics Explorer** → search `claude_code` — test counters should appear within seconds
+- **Logs** → filter `subsystemName = claude-code-sessions` — test log events appear there
 
 ---
 
-## Finding your data in Coralogix
+## Pre-built dashboard
 
-| Where | What to look for |
+Import `coralogix-dashboard.json` for an instant view of all signals.
+
+**Sections:**
+
+| Section | What you see |
 |---|---|
-| **Metrics Explorer** | Search `claude_code` — all counters appear here |
-| **Logs** | Filter `subsystemName = claude-code-sessions` |
-| **Dashboards** | Import `coralogix-dashboard.json` (see above) |
+| **KPI Bar** | Sessions · Cost · Tokens · Active Time · Lines Changed · Commits — all as number cards |
+| **Session Activity** | Sessions over time · Avg duration · Tokens per session |
+| **Cost & Token Breakdown** | Cost/session · Cost by model · Tokens by model · Tokens by type · API token volume · Cost per token |
+| **Code Impact** | Lines added/removed by type · Commits over time · Aggregate line changes |
+| **Code Edit Behaviour** | Acceptance rate arc gauge · Decisions by type · Decision volume over time |
+| **Prompt Log** | Live DataPrime table — timestamp · user · session · model · prompt text |
+
+**To import:**
+1. In your Coralogix tenant go to **Dashboards → New Dashboard**
+2. Click the menu icon → **Import from JSON**
+3. Paste the contents of `coralogix-dashboard.json` and save
 
 ---
 
 ## Advanced configuration
 
-| Variable | Default | Effect |
+| Variable | Default | Purpose |
 |---|---|---|
-| `OTEL_METRIC_EXPORT_INTERVAL` | `60000` | Metric flush interval in ms — set to `10000` while debugging |
-| `OTEL_LOGS_EXPORT_INTERVAL` | `5000` | Log flush interval in ms |
-| `OTEL_LOG_USER_PROMPTS` | off | Set to `1` to capture prompt content in log events |
-| `OTEL_LOG_TOOL_DETAILS` | off | Set to `1` to include MCP server and tool names in tool events |
-| `OTEL_RESOURCE_ATTRIBUTES` | — | Append custom attributes, e.g. `team=platform,env=prod` |
-| `OTEL_METRICS_INCLUDE_SESSION_ID` | `true` | Adds `session.id` to metric labels (increases cardinality) |
-| `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` | `true` | Adds `user.account_uuid` to metric labels |
+| `OTEL_METRIC_EXPORT_INTERVAL` | `60000` ms | How often metrics are flushed — lower to `10000` when testing |
+| `OTEL_LOGS_EXPORT_INTERVAL` | `5000` ms | Log flush interval |
+| `OTEL_LOG_USER_PROMPTS` | off | Set to `1` to include prompt text in `claude_code.user_prompt` log events |
+| `OTEL_LOG_TOOL_DETAILS` | off | Set to `1` to add MCP server and tool names to tool events |
+| `OTEL_RESOURCE_ATTRIBUTES` | — | Add custom dimensions, e.g. `team=platform,env=prod` |
+| `OTEL_METRICS_INCLUDE_SESSION_ID` | `true` | Attaches `session.id` to metric labels — disable to reduce cardinality |
+| `OTEL_METRICS_INCLUDE_ACCOUNT_UUID` | `true` | Attaches `user.account_uuid` to metric labels |
