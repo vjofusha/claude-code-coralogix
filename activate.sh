@@ -30,6 +30,9 @@ export OTEL_RESOURCE_ATTRIBUTES="cx.application.name=${CX_APPLICATION_NAME},cx.s
 # Coralogix works best with delta temporality for counters
 export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
 
+# Log the content of user prompts — disabled by default, uncomment to enable
+# export OTEL_LOG_USER_PROMPTS=1
+
 echo "✓  Claude Code → Coralogix telemetry configured"
 echo "   Endpoint : ${OTEL_EXPORTER_OTLP_ENDPOINT}"
 echo "   App      : ${CX_APPLICATION_NAME}"

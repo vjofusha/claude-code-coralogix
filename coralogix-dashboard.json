@@ -1,6 +1,6 @@
 {
-  "id": "S7s3X66tbXVp8jDqWNhDt",
-  "name": "Claude Code Monitoring (imported)",
+  "id": "VaZbO8HRTDvUdZdMeSmgo",
+  "name": "Claude Code Monitoring",
   "layout": {
     "sections": [
       {
@@ -194,9 +194,22 @@
                 "title": "Prompt Log",
                 "definition": {
                   "dataTable": {
-                    "query": { "dataprime": { "dataprimeQuery": { "text": "source logs\n| filter $l.subsystemname == 'claude-code-sessions'\n| orderby $m.timestamp desc\n| limit 200" }, "filters": [] } },
-                    "resultsPerPage": 50, "rowStyle": "ROW_STYLE_ONE_LINE",
-                    "columns": [ { "field": "$m.timestamp", "width": 200 }, { "field": "$d.session.id", "width": 240 }, { "field": "$d.ai.model.id", "width": 200 }, { "field": "$d.event.name", "width": 180 }, { "field": "$d.body", "width": 520 } ],
+                    "query": {
+                      "dataprime": {
+                        "dataprimeQuery": {
+                          "text": "source logs | choose $d.logRecord.attributes['user.id'] as user_id, $d.logRecord.attributes['session.id'] as sessions, $d.logRecord.attributes.prompt as prompt, $d ~~ 'model' as model"
+                        },
+                        "filters": []
+                      }
+                    },
+                    "resultsPerPage": 100,
+                    "rowStyle": "ROW_STYLE_ONE_LINE",
+                    "columns": [
+                      { "field": "$m.timestamp" },
+                      { "field": "$d" },
+                      { "field": "$l.applicationname" },
+                      { "field": "$l.subsystemname" }
+                    ],
                     "dataModeType": "DATA_MODE_TYPE_HIGH_UNSPECIFIED"
                   }
                 }
@@ -211,7 +224,7 @@
   "variables": [],
   "variablesV2": [],
   "filters": [],
-  "relativeTimeFrame": "3600s",
+  "relativeTimeFrame": "7200s",
   "annotations": [],
   "off": {},
   "actions": []

@@ -233,16 +233,16 @@ d = {
                         'Prompt Log',
                         (
                             "source logs\n"
-                            "| filter $l.subsystemname == 'claude-code-sessions'\n"
-                            "| orderby $m.timestamp desc\n"
-                            "| limit 200"
+                            "| choose $d.logRecord.attributes['user.id'] as user_id,"
+                            " $d.logRecord.attributes['session.id'] as sessions,"
+                            " $d.logRecord.attributes.prompt as prompt,"
+                            " $d ~~ 'model' as model"
                         ),
                         [
-                            {'field': '$m.timestamp',   'width': 200},
-                            {'field': '$d.session.id',  'width': 240},
-                            {'field': '$d.ai.model.id', 'width': 200},
-                            {'field': '$d.event.name',  'width': 180},
-                            {'field': '$d.body',        'width': 520},
+                            {'field': 'user_id',  'width': 200},
+                            {'field': 'sessions', 'width': 240},
+                            {'field': 'model',    'width': 200},
+                            {'field': 'prompt',   'width': 600},
                         ]
                     )
                 ]),
